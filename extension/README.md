@@ -1,4 +1,4 @@
-# Flow Capture Observer (Chrome extension) — v1.1.0
+# Flow Capture Observer (Chrome extension) — v1.2.0
 
 A small extension that **observes** Google Flow generate requests and logs
 them. It is the capture tool for the DevTools plan, without needing DevTools.
@@ -26,26 +26,43 @@ them. It is the capture tool for the DevTools plan, without needing DevTools.
    API works. The listener is guarded: if the browser does not offer the
    event (Orion on iOS), the background keeps running and the popup says so.
 2. **Page hook** — a MAIN-world content script (`content-main.js`) wraps the
-   Flow page's own `fetch` and `XMLHttpRequest` and forwards each
-   `batchexecute` call to the background. This is the working path on Orion
-   for iOS, where webRequest is unreliable. It only sees requests the page's
-   own JavaScript makes.
+   Flow page's own `fetch` and `XMLHttpRequest`. A MAIN-world script cannot
+   call `chrome.*` APIs, so it hands each capture to an isolated-world
+   bridge (`content-bridge.js`) via `window.postMessage`, and the bridge
+   forwards it to the background. This is the working path on Orion for iOS,
+   where webRequest is unreliable. It only sees requests the page's own
+   JavaScript makes.
 
-The popup shows which path is active: `webRequest: on/off` and
+The background de-duplicates: if both paths see the same request, it is
+logged once. The popup shows which path is active: `webRequest: on/off` and
 `page hook: active/not seen yet`.
 
-## How to load it (Codespace desktop Chrome)
+## What changed in v1.2.0
 
-1. Open Chrome in the Codespace desktop.
-2. Go to `chrome://extensions`.
-3. Turn on **Developer mode** (top right).
-4. Click **Load unpacked** and pick this `extension/` folder.
-5. Open Flow, generate something, then click the extension icon to see the
+- **Fixed:** the page hook called `chrome.runtime.sendMessage` from the MAIN
+  world, where extension APIs do not exist — captures were silently dropped.
+  It now goes through the `content-bridge.js` postMessage bridge.
+- **Fixed:** `fetch(new Request(...))` calls carried no readable body; the
+  hook now clones the Request and reads its body without consuming it.
+- **Fixed:** double-logging when webRequest and the page hook both fire.
+- **Fixed:** popup Download/Copy/Clear broke silently when the background
+  was asleep; they now fall back to the saved log in `chrome.storage.local`.
+- **Added:** double-injection guard in the page hook, extension icons.
+
+## How to load it (desktop Chrome)
+
+1. Go to `chrome://extensions`.
+2. Turn on **Developer mode** (top right).
+3. Click **Load unpacked** and pick this extension folder.
+4. Open Flow, generate something, then click the extension icon to see the
    captured requests. **Download log (JSON)** or **Copy log** saves them.
 
 ## How to install it (Orion on iOS)
 
-1. Save the extension ZIP in the Files app on **On My iPhone** local storage
+The ZIP must have `manifest.json` at its root (this one does — do not
+re-zip it inside another folder).
+
+1. Save the ZIP in the Files app on **On My iPhone** local storage
    (not iCloud Drive).
 2. In Orion: `⋯` → **Settings → Extensions** → turn **Chrome extensions ON**.
 3. `⋯` → **Extensions** → **+** → **Install from File** → pick the ZIP.

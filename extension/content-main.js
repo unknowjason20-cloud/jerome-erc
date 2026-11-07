@@ -2,15 +2,25 @@
 // Wraps the Flow page's own fetch() and XMLHttpRequest so batchexecute
 // requests are captured even where chrome.webRequest does not fire
 // (Orion on iOS). Observation only: it never changes a request, it only
-// reads the URL and the body and forwards a copy to the background.
-// Runs in the page's main world so window.fetch is the page's fetch.
+// reads the URL and the body.
+//
+// IMPORTANT: a MAIN-world script has NO access to chrome.* extension APIs
+// (chrome.runtime.sendMessage is undefined here in Chrome, and unreliable
+// in Orion). So this file never touches chrome.* — it hands each capture
+// to the isolated-world bridge (content-bridge.js) via window.postMessage,
+// and the bridge forwards it to the background.
 (function () {
   "use strict";
+  // Guard against double-injection (Orion may run content scripts twice).
+  if (window.__flowCaptureHookInstalled) return;
+  window.__flowCaptureHookInstalled = true;
+
   const MAX_BODY_CHARS = 200000;
+  const MARKER = "__flowCaptureObserver";
 
   function rpcidsFromUrl(url) {
     try {
-      const ids = new URL(url).searchParams.get("rpcids");
+      const ids = new URL(url, location.href).searchParams.get("rpcids");
       return ids ? ids.split(",") : [];
     } catch (e) {
       return [];
@@ -47,11 +57,9 @@
 
   function send(entry) {
     try {
-      if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
-        chrome.runtime.sendMessage({ type: "pageRequest", entry });
-      }
+      window.postMessage({ [MARKER]: true, kind: "pageRequest", entry }, location.origin);
     } catch (e) {
-      // Background unreachable: drop the entry, never break the page.
+      // Never break the page.
     }
   }
 
@@ -70,11 +78,9 @@
     }
   }
 
-  // Tell the background the hook is installed.
+  // Tell the bridge the hook is installed.
   try {
-    if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
-      chrome.runtime.sendMessage({ type: "pageHookReady" });
-    }
+    window.postMessage({ [MARKER]: true, kind: "pageHookReady" }, location.origin);
   } catch (e) {}
 
   // Hook fetch.
@@ -85,8 +91,16 @@
         try {
           const url = typeof input === "string" ? input : (input && input.url) || "";
           const method = (init && init.method) || (input && input.method) || "GET";
-          const body = init && init.body !== undefined ? init.body : (input && input.body);
-          capture(url, method, body);
+          let body = init && init.body !== undefined ? init.body : undefined;
+          if (body === undefined && input && typeof Request !== "undefined" && input instanceof Request) {
+            // A Request object carries its body internally; clone+read it
+            // without consuming the original.
+            try {
+              input.clone().text().then((t) => capture(url, method, t)).catch(() => {});
+              body = null; // capture happens async above
+            } catch (e) {}
+          }
+          if (body !== null) capture(url, method, body);
         } catch (e) {}
         return origFetch.apply(this, arguments);
       };

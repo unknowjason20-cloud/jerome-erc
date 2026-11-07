@@ -38,6 +38,18 @@ function persist() {
 }
 
 function pushEntry(entry) {
+  // Dedupe: on desktop both capture paths can see the same request
+  // (webRequest + page hook). Drop an identical url+body seen < 3s ago.
+  try {
+    const t = Date.parse(entry.time || "");
+    for (let i = entries.length - 1; i >= 0 && i >= entries.length - 20; i--) {
+      const prev = entries[i];
+      if (prev.url === entry.url && prev.frep === entry.frep) {
+        const pt = Date.parse(prev.time || "");
+        if (!isNaN(t) && !isNaN(pt) && Math.abs(t - pt) < 3000) return;
+      }
+    }
+  } catch (e) {}
   entries.push(entry);
   if (entries.length > MAX_ENTRIES) entries.shift();
   persist();
@@ -95,7 +107,10 @@ try {
   status.webRequest = false;
 }
 
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+// Guarded like everything else: if chrome.runtime is somehow absent at
+// startup, the listeners above must not take the whole file down with them.
+try {
+  chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (!msg || typeof msg.type !== "string") return false;
   if (msg.type === "pageRequest" && msg.entry) {
     status.pageHook = true;
@@ -123,4 +138,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     sendResponse({ ok: true });
   }
   return true;
-});
+  });
+} catch (e) {
+  // chrome.runtime missing: nothing else can be done from the background.
+}

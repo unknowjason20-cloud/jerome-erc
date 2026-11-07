@@ -71,24 +71,52 @@ function fallbackCopy(text) {
 document.getElementById("refresh").addEventListener("click", load);
 
 document.getElementById("clear").addEventListener("click", () => {
-  chrome.runtime.sendMessage({ type: "clearLog" }, load);
+  try {
+    chrome.runtime.sendMessage({ type: "clearLog" }, () => {
+      if (chrome.runtime.lastError) {
+        // Background unreachable: clear the saved copy directly.
+        try {
+          chrome.storage.local.set({ flowCaptureLog: [] }, load);
+        } catch (e) {
+          load();
+        }
+        return;
+      }
+      load();
+    });
+  } catch (e) {
+    load();
+  }
 });
 
 document.getElementById("download").addEventListener("click", () => {
-  chrome.runtime.sendMessage({ type: "getLog" }, (res) => {
-    const entries = (res && res.entries) || [];
+  const save = (entries) => {
     const blob = new Blob([JSON.stringify(entries, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = "flow-capture-log.json";
     a.click();
-    URL.revokeObjectURL(a.href);
-  });
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  };
+  try {
+    chrome.runtime.sendMessage({ type: "getLog" }, (res) => {
+      if (chrome.runtime.lastError || !res) {
+        try {
+          chrome.storage.local.get({ flowCaptureLog: [] }, (r) => save((r && r.flowCaptureLog) || []));
+        } catch (e) {
+          save([]);
+        }
+        return;
+      }
+      save(res.entries || []);
+    });
+  } catch (e) {
+    loadFromStorage();
+  }
 });
 
 document.getElementById("copy").addEventListener("click", () => {
-  chrome.runtime.sendMessage({ type: "getLog" }, (res) => {
-    const entries = (res && res.entries) || [];
+  const doCopy = (entries) => {
     const text = JSON.stringify(entries, null, 2);
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(() => {
@@ -99,7 +127,22 @@ document.getElementById("copy").addEventListener("click", () => {
     } else {
       fallbackCopy(text);
     }
-  });
+  };
+  try {
+    chrome.runtime.sendMessage({ type: "getLog" }, (res) => {
+      if (chrome.runtime.lastError || !res) {
+        try {
+          chrome.storage.local.get({ flowCaptureLog: [] }, (r) => doCopy((r && r.flowCaptureLog) || []));
+        } catch (e) {
+          doCopy([]);
+        }
+        return;
+      }
+      doCopy(res.entries || []);
+    });
+  } catch (e) {
+    doCopy([]);
+  }
 });
 
 load();
