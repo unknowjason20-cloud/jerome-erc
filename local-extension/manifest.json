@@ -1,0 +1,25 @@
+{
+  "content_scripts": [
+    {
+      "js": [
+        "content-local.js"
+      ],
+      "matches": [
+        "*://flow.google.com/*"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "description": "Fill-only helper for Google Flow on Orion iOS. It fills your prompt and settings (model, aspect, count, duration) into Flow's own composer on flow.google.com. No server, no token, no terminal, no network calls at all \u2014 and it never taps Send: you tap Flow's own Send button yourself.",
+  "icons": {
+    "128": "icons/icon128.png",
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png"
+  },
+  "manifest_version": 3,
+  "name": "Flow Local",
+  "permissions": [
+    "storage"
+  ],
+  "version": "1.0.0"
+}
