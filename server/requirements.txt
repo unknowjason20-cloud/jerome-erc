@@ -1,0 +1,2 @@
+# Stdlib only — no third-party dependencies.
+# (Intentionally empty apart from this comment.)

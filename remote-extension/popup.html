@@ -1,0 +1,113 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { width: 380px; max-width: 100vw; font-family: sans-serif; font-size: 14px; margin: 0; padding: 12px; box-sizing: border-box; color: #111; }
+  h1 { font-size: 17px; margin: 0 0 4px; }
+  h2 { font-size: 14px; margin: 14px 0 6px; }
+  .sub { color: #555; font-size: 12px; margin-bottom: 10px; }
+  #status { padding: 10px; border-radius: 8px; font-weight: bold; margin-bottom: 8px; background: #eee; }
+  #status.connected { background: #dcf5dd; color: #145a1a; }
+  #status.stopped { background: #fde2e2; color: #8a1a1a; }
+  #status.offline { background: #fff3cd; color: #6b4e00; }
+  #status.not-configured { background: #eee; color: #555; }
+  #status-detail { font-size: 12px; font-weight: normal; margin-top: 4px; }
+  label { display: block; font-weight: bold; margin: 8px 0 3px; font-size: 13px; }
+  input[type="text"], input[type="password"], input[type="number"], select, textarea {
+    width: 100%; box-sizing: border-box; font-size: 15px; padding: 10px;
+    border: 1px solid #aaa; border-radius: 8px; font-family: sans-serif;
+  }
+  textarea { min-height: 64px; resize: vertical; }
+  button { font-size: 15px; padding: 11px 14px; border-radius: 8px; border: 1px solid #888; background: #f2f2f2; cursor: pointer; min-height: 44px; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  button.primary { background: #1a73e8; color: #fff; border-color: #1a73e8; width: 100%; font-weight: bold; }
+  .row { display: flex; gap: 8px; margin: 8px 0; flex-wrap: wrap; }
+  .row button { flex: 1; }
+  .radio-row { display: flex; gap: 16px; margin: 6px 0; }
+  .radio-row label { display: inline; font-weight: normal; margin: 0; }
+  .hint { font-size: 12px; color: #555; margin-top: 3px; }
+  .warn { background: #fff3cd; border: 1px solid #e0a800; border-radius: 8px; padding: 8px; font-size: 13px; margin: 8px 0; }
+  .error { background: #fde2e2; border: 1px solid #d33; border-radius: 8px; padding: 8px; font-size: 13px; margin: 8px 0; color: #8a1a1a; }
+  .ok-msg { background: #dcf5dd; border-radius: 8px; padding: 8px; font-size: 13px; margin: 8px 0; color: #145a1a; }
+  details { border: 1px solid #ccc; border-radius: 8px; padding: 8px 10px; margin: 8px 0; }
+  details summary { cursor: pointer; font-weight: bold; font-size: 14px; padding: 4px 0; }
+  .job { border-top: 1px solid #ddd; padding: 8px 0; word-break: break-word; }
+  .job-head { margin-bottom: 3px; }
+  .job-meta { font-size: 12px; color: #666; }
+  .job-error { font-size: 13px; color: #8a1a1a; margin-top: 4px; }
+  .job-blocked { font-size: 13px; background: #fde2e2; border: 1px solid #d33; border-radius: 6px; padding: 6px; margin-top: 4px; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: bold; color: #fff; background: #888; }
+  .badge-queued { background: #6c757d; }
+  .badge-running { background: #1a73e8; }
+  .badge-done { background: #188038; }
+  .badge-failed { background: #c5221f; }
+  .badge-blocked { background: #b06000; }
+  .media-item { margin: 6px 0; font-size: 13px; }
+  .media-item button, .media-item a { font-size: 13px; padding: 6px 10px; min-height: 36px; }
+  .empty { color: #666; font-size: 13px; padding: 6px 0; }
+  footer { margin-top: 16px; border-top: 1px solid #ddd; padding-top: 8px; font-size: 12px; color: #555; }
+</style>
+</head>
+<body>
+<h1>Flow Remote</h1>
+<div class="sub">Your Codespace server does the clicking in headed Chrome. This extension only sends jobs to it.</div>
+
+<div id="status" class="not-configured">Not configured</div>
+<div id="status-detail" class="hint"></div>
+
+<details id="settings-details">
+  <summary>Settings — server URL &amp; pairing token</summary>
+  <label for="server-url">Server URL</label>
+  <input type="text" id="server-url" placeholder="https://&lt;name&gt;-8766.app.github.dev" autocomplete="off" autocapitalize="off" spellcheck="false">
+  <div class="hint">The Codespace forwarded URL, no trailing slash.</div>
+  <label for="token">Pairing token</label>
+  <input type="password" id="token" placeholder="Paste the token from the Codespace terminal" autocomplete="off">
+  <div class="hint">The token is only stored in this browser (chrome.storage.local) and sent to your server as the X-Flow-Token header.</div>
+  <div class="row">
+    <button type="button" id="save-settings">Save</button>
+    <button type="button" id="test-connection">Test connection</button>
+  </div>
+  <div id="settings-msg"></div>
+</details>
+
+<h2>Account</h2>
+<div class="row">
+  <select id="account" aria-label="Account"></select>
+  <button type="button" id="refresh-accounts">Refresh</button>
+</div>
+<div id="account-warn"></div>
+
+<h2>New job</h2>
+<div class="radio-row" role="radiogroup" aria-label="Kind">
+  <label><input type="radio" name="kind" value="image" checked> Image</label>
+  <label><input type="radio" name="kind" value="video"> Video</label>
+</div>
+<label for="prompt">Prompt</label>
+<textarea id="prompt" placeholder="Describe what to generate…"></textarea>
+<label for="model">Model</label>
+<select id="model"></select>
+<label for="aspect">Aspect</label>
+<select id="aspect"></select>
+<div id="count-row">
+  <label for="count">Count (image only)</label>
+  <input type="number" id="count" min="1" max="4" value="1">
+</div>
+<div id="duration-row" style="display:none">
+  <label for="duration">Duration (video only)</label>
+  <select id="duration"></select>
+</div>
+<div class="row"><button type="button" class="primary" id="send-job">Send job</button></div>
+<div id="job-msg"></div>
+
+<h2>Jobs</h2>
+<div class="row"><button type="button" id="refresh-jobs">Refresh jobs</button></div>
+<div id="jobs-list"><div class="empty">No jobs yet.</div></div>
+
+<footer>Server does the clicking in the Codespace. Never paste your Google password here. If a job says blocked, stop and restart the server.</footer>
+
+<script src="api.js"></script>
+<script src="popup.js"></script>
+</body>
+</html>
