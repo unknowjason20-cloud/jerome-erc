@@ -7,7 +7,7 @@ const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
 
-const STAGING = path.join(__dirname, "..");
+const STAGING = path.join(__dirname, "..", "..");
 const api = require(path.join(STAGING, "remote-extension", "api.js"));
 
 const failures = [];

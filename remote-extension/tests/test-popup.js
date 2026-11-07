@@ -14,7 +14,7 @@ const fs = require("fs");
 const path = require("path");
 const assert = require("assert");
 
-const EXT_DIR = path.join(__dirname, "..", "remote-extension");
+const EXT_DIR = path.join(__dirname, "..");
 const api = require(path.join(EXT_DIR, "api.js"));
 
 let pass = 0;
@@ -220,7 +220,7 @@ const SETTINGS = { serverUrl: "https://test-8766.app.github.dev/", token: "secre
     const manifest = JSON.parse(fs.readFileSync(path.join(EXT_DIR, "manifest.json"), "utf8"));
     assert.strictEqual(manifest.manifest_version, 3);
     assert.strictEqual(manifest.name, "Flow Remote");
-    assert.strictEqual(manifest.version, "1.0.0");
+    assert.strictEqual(manifest.version, "1.1.0");
     assert.deepStrictEqual(manifest.permissions, ["storage"]);
     assert.ok(Array.isArray(manifest.background.scripts) && manifest.background.scripts.includes("background.js"));
     assert.strictEqual(manifest.background.service_worker, "background.js");

@@ -14,9 +14,9 @@
 ## Tapos na / built na — hindi mo na kailangang gawin
 
 - ✅ Ang server (Python, walang pip install na kailangan) — nasa `server/` folder.
-- ✅ Ang extension na "Flow Remote" v1.0.0 — nasa `remote-extension/` folder, at may ZIP na rin (`flow-remote-v1.0.0-orion.zip`).
+- ✅ Ang extension na "Flow Remote" v1.1.0 — nasa `remote-extension/` folder, at may ZIP na rin (`flow-remote-v1.1.0-orion.zip`). **v1.1.0: in-page panel na ang UI, hindi popup** — sa Orion ayaw lumabas ng popup, kaya ang panel na nasa mismong flow.google.com page ang gagamitin mo (floating ⚡ button, i-tap mo lang). Ang popup ay pang-desktop na lang.
 - ✅ Ang Codespace setup (`.devcontainer/`) — nag-i-install ng totoong Chrome + `gflow` + desktop, at naka-set na ang `DISPLAY=:1`.
-- ✅ Mock tests: server 13 passed / 0 failed; extension 14 passed / 0 failed; end-to-end mock 18 passed / 0 failed. **Mock lang lahat — hindi pa ito nasubukan sa totoong Flow.**
+- ✅ Mock tests: server 13 passed / 0 failed; extension panel chain 26 passed / 0 failed; extension popup 14 passed / 0 failed; end-to-end mock 18 passed / 0 failed. **Mock lang lahat — hindi pa ito nasubukan sa totoong Flow.**
 
 ## Ikaw ang gagawa nito — ang mga hakbang sa ibaba
 
@@ -26,7 +26,7 @@
 
 - [ ] GitHub account mo (yung may access sa repo na **jerome-erc**).
 - [ ] **Orion browser** sa iPhone mo (doon lang mai-install ang extension).
-- [ ] Ang extension ZIP — **`flow-remote-v1.0.0-orion.zip`** — naka-attach sa chat message kung saan mo ito natanggap.
+- [ ] Ang extension ZIP — **`flow-remote-v1.1.0-orion.zip`** — naka-attach sa chat message kung saan mo ito natanggap.
 - [ ] Dalawang Google account: ang **main account** mo at ang **test account** (`unknowjason20@gmail.com`). **Test account muna ang gagamitin mo** — huwag ang main sa unang test.
 - [ ] Phone mo, handa para sa 2FA / verification kung hingin ng Google.
 
@@ -95,7 +95,7 @@ Kailangan makita ng iPhone mo ang server. Gawin ito sa **Ports** view ng VS Code
 
 ## Hakbang 4: Ilagay ang URL at token sa extension
 
-1. Buksan ang extension popup sa Orion (pagkatapos mo itong ma-install sa Hakbang 6 — kung hindi pa naka-install, gawin mo muna ang Hakbang 6, tapos bumalik dito).
+1. Buksan ang **flow.google.com** sa Orion (pagkatapos mo itong ma-install sa Hakbang 6 — kung hindi pa naka-install, gawin mo muna ang Hakbang 6, tapos bumalik dito). May lilitaw na floating button na **⚡ Flow Remote** sa page — i-tap mo ito para buksan ang panel. (Hindi na popup ang UI sa Orion — ayaw lumabas ng popup doon.)
 2. Pumunta sa **Settings**.
 3. I-paste ang **Server URL** — yung forwarded URL mula sa Hakbang 3 (hal. `https://<pangalan>-8766.app.github.dev`, **walang trailing slash** sa dulo).
 4. I-paste ang **Pairing token** — yung kinopya mo sa terminal sa Hakbang 2.
@@ -136,10 +136,10 @@ gflow auth status
 
 ## Hakbang 6: I-install ang extension ZIP sa Orion
 
-1. Kunin ang ZIP na **`flow-remote-v1.0.0-orion.zip`** at i-save ito sa **On My iPhone** (local storage — **hindi** iCloud Drive).
+1. Kunin ang ZIP na **`flow-remote-v1.1.0-orion.zip`** at i-save ito sa **On My iPhone** (local storage — **hindi** iCloud Drive).
 2. Buksan ang **Orion** sa iPhone mo.
 3. Pumunta sa **`⋯` → Extensions → `+` → Install from File**, at piliin ang ZIP.
-4. Kapag na-install na, i-tap ang **Flow Remote** icon para buksan ang popup.
+4. Kapag na-install na, buksan ang **flow.google.com** sa Orion — may lilitaw na floating button na **⚡ Flow Remote**. I-tap mo ito para buksan ang panel.
 
 **Kung ayaw gumana ng Install from File:**
 
@@ -157,7 +157,7 @@ Kapag naka-install na, bumalik ka sa **Hakbang 4** para ilagay ang URL at token.
 
 **Huwag video ang unang test. Image lang — libre ito.**
 
-1. Sa extension popup, piliin ang **test account** sa account picker. Kung may nakasulat na "session missing", bumalik ka sa Hakbang 5 at mag-login ka muna.
+1. Sa panel, piliin ang **test account** sa account picker. Kung may nakasulat na "session missing", bumalik ka sa Hakbang 5 at mag-login ka muna.
 2. I-type ang prompt mo (hal. `a lighthouse at dusk`).
 3. Siguraduhin ang settings:
    - **Kind:** image
@@ -168,7 +168,7 @@ Kapag naka-install na, bumalik ka sa **Hakbang 4** para ilagay ang URL at token.
 
 ### Paano malalaman kung gumana
 
-- Sa **Jobs** list ng popup, makikita mo ang job mo. Magre-refresh ito kada 5 segundo habang bukas ang popup.
+- Sa **Jobs** list ng panel, makikita mo ang job mo. Magre-refresh ito kada 5 segundo habang bukas ang panel.
 - Kapag naging **`done`** ang status at may **media link** (o **Open / Copy URL**) na lumabas, **gumana ito**. I-tap ang link para makita ang image.
 - Habang `queued` o `running` pa, maghintay ka lang — umaabot ito ng ilang minuto.
 
@@ -207,7 +207,7 @@ Saka ka lang mag-test ng video — at **isang video lang muna**, 8 segundo, `veo
 
 ## Checklist — lahat ng hakbang
 
-- [ ] Nakuha ko ang extension ZIP (`flow-remote-v1.0.0-orion.zip`) mula sa chat (naka-attach).
+- [ ] Nakuha ko ang extension ZIP (`flow-remote-v1.1.0-orion.zip`) mula sa chat (naka-attach).
 - [ ] Gumawa ako ng Codespace mula sa repo na **jerome-erc** (Code → Codespaces → Create codespace on main, 2-core).
 - [ ] Hinintay kong matapos mag-build ang Codespace.
 - [ ] Na-sync na sa repo ang `server/` at `remote-extension/` files.
@@ -220,7 +220,7 @@ Saka ka lang mag-test ng video — at **isang video lang muna**, 8 segundo, `veo
 - [ ] Na-install ko ang extension ZIP sa Orion (⋯ → Extensions → + → Install from File).
 - [ ] Nilagay ko ang Server URL at pairing token sa extension Settings at nag-**Test connection** ako.
 - [ ] Nag-send ako ng unang test: **libreng image** (nano2, 9:16, 1 pc, test account).
-- [ ] Nakita ko ang job status na **`done`** at ang media link sa popup.
+- [ ] Nakita ko ang job status na **`done`** at ang media link sa panel.
 
 ---
 
