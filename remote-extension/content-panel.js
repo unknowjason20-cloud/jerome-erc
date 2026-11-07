@@ -1,4 +1,4 @@
-// Flow Remote — content-panel.js (v1.1.0)
+// Flow Remote — content-panel.js (v1.1.1)
 // In-page panel UI for Orion iOS. The MV3 default_popup never appears on
 // Orion iOS, so this content script is the PRIMARY UI: a floating button +
 // Shadow-DOM panel injected on flow.google.com, with the full remote UI
@@ -31,14 +31,112 @@
 (function () {
   "use strict";
 
-  var api = null;
-  try {
-    api = (typeof FlowRemoteApi !== "undefined") ? FlowRemoteApi : null;
-  } catch (e) { api = null; }
-  if (!api && typeof require === "function") {
-    try { api = require("./api.js"); } catch (e) { api = null; }
+  // Self-contained in v1.1.1: the pure helpers below are inlined from
+  // api.js so this content script is a SINGLE file with no cross-file
+  // global dependency (Orion iOS failed to load the two-file entry).
+  // The popup still loads api.js itself on desktop; the logic is
+  // identical, just duplicated for robustness on Orion.
+
+  var IMAGE_MODELS = [
+    { value: "nano2", label: "Nano Banana 2 (cheapest)" },
+    { value: "nano-pro", label: "Nano Banana Pro" },
+    { value: "nano2-lite", label: "Nano Banana 2 Lite" },
+    { value: "imagen4", label: "Imagen 4" }
+  ];
+
+  var VIDEO_MODELS = [
+    { value: "veo-lite", label: "Veo Lite (cheapest)" },
+    { value: "veo-fast", label: "Veo Fast" },
+    { value: "omni-flash", label: "Omni Flash" }
+  ];
+
+  var IMAGE_ASPECTS = ["9:16", "16:9", "1:1", "4:3", "3:4"];
+
+  var VIDEO_ASPECTS = ["9:16", "16:9"];
+
+  function normalizeBaseUrl(url) {
+    if (typeof url !== "string") return "";
+    return url.trim().replace(/\/+$/, "");
   }
-  if (!api) return; // api.js failed to load; nothing usable can be done.
+
+  function apiError(code, message) {
+    var err = new Error(message);
+    err.code = code;
+    return err;
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
+  function truncate(s, n) {
+    var str = String(s == null ? "" : s);
+    return str.length > n ? str.slice(0, n - 1) + "…" : str;
+  }
+
+  function jobRowHtml(job) {
+    var status = (job && job.status) || "unknown";
+    var kind = escapeHtml(job && job.kind ? job.kind : "?");
+    var prompt = escapeHtml(truncate(job && job.prompt ? job.prompt : "(no prompt)", 80));
+    var profile = escapeHtml(job && job.profile ? job.profile : "");
+    var id = escapeHtml(job && job.id ? job.id : "");
+    var err = job && (job.error || job.error_code)
+      ? escapeHtml([job.error_code, job.error].filter(Boolean).join(": "))
+      : "";
+    var html = '<div class="job job-' + escapeHtml(status) + '" data-job-id="' + id + '">' +
+      '<div class="job-head"><span class="badge badge-' + escapeHtml(status) + '">' +
+      escapeHtml(status) + '</span> <b>' + kind + '</b> ' + prompt + '</div>' +
+      '<div class="job-meta">' + (profile ? "Profile: " + profile + " · " : "") +
+      (id ? "ID: " + id : "") + '</div>';
+    if (err) html += '<div class="job-error">' + err + '</div>';
+    if (status === "blocked") {
+      html += '<div class="job-blocked">⚠️ Flow flagged unusual activity on this job. ' +
+        'Do NOT resend it — stop and restart the server.</div>';
+    }
+    var media = job && job.results && Array.isArray(job.results.media) ? job.results.media : [];
+    if (status === "done" && media.length) {
+      html += '<div class="media">';
+      media.forEach(function (m, i) {
+        var url = m && m.url ? String(m.url) : "";
+        var mKind = m && m.kind ? String(m.kind) : "media";
+        if (!url) return;
+        html += '<div class="media-item"><span>' + escapeHtml(mKind) + ' ' + (i + 1) + '</span> ' +
+          '<a href="' + escapeHtml(url) + '" target="_blank" rel="noopener">Open</a> ' +
+          '<button type="button" class="copy-btn" data-url="' + escapeHtml(url) + '">Copy URL</button> ' +
+          '<button type="button" class="dl-btn" data-url="' + escapeHtml(url) + '">Download</button></div>';
+      });
+      html += '</div>';
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function jobListHtml(jobs) {
+    if (!Array.isArray(jobs) || !jobs.length) {
+      return '<div class="empty">No jobs yet.</div>';
+    }
+    return jobs.map(jobRowHtml).join("");
+  }
+
+  function modelOptionsForKind(kind) {
+    return kind === "video" ? VIDEO_MODELS.slice() : IMAGE_MODELS.slice();
+  }
+
+  function defaultModelForKind(kind) {
+    return kind === "video" ? "veo-lite" : "nano2";
+  }
+
+  function aspectOptionsForKind(kind) {
+    return kind === "video" ? VIDEO_ASPECTS.slice() : IMAGE_ASPECTS.slice();
+  }
+
+  function durationOptionsForModel(model) {
+    var opts = [{ value: "8", label: "8s" }];
+    if (model === "omni-flash") opts.push({ value: "10", label: "10s (Omni Flash only)" });
+    return opts;
+  }
 
   // Double-injection guard (Orion may run content scripts twice).
   try {
@@ -215,18 +313,18 @@
       try {
         if (typeof chrome === "undefined" || !chrome.runtime ||
             typeof chrome.runtime.sendMessage !== "function") {
-          finishErr(api.apiError("network",
+          finishErr(apiError("network",
             "Extension messaging is unavailable (background not running). Reload the page."));
           return;
         }
         timer = setTimeout(function () {
-          finishErr(api.apiError("network",
+          finishErr(apiError("network",
             "Background did not answer — it may be suspended. Reload the page."));
         }, timeoutMs || API_TIMEOUT_MS);
         chrome.runtime.sendMessage(msg, function (res) {
           try {
             if (chrome.runtime && chrome.runtime.lastError) {
-              finishErr(api.apiError("network",
+              finishErr(apiError("network",
                 "Background did not answer (messaging error). Reload the page."));
               return;
             }
@@ -234,7 +332,7 @@
           finishOk(res);
         });
       } catch (e) {
-        finishErr(api.apiError("network",
+        finishErr(apiError("network",
           "Could not reach the background: " + (e && e.message ? e.message : "unknown error")));
       }
     });
@@ -248,10 +346,10 @@
       API_TIMEOUT_MS
     ).then(function (res) {
       if (!res) {
-        throw api.apiError("network", "Background did not answer. Reload the page and try again.");
+        throw apiError("network", "Background did not answer. Reload the page and try again.");
       }
       if (res.ok) return res.data;
-      throw api.apiError(res.code || "server", res.message || "Server error.");
+      throw apiError(res.code || "server", res.message || "Server error.");
     });
   }
 
@@ -366,9 +464,9 @@
 
   function refreshModelLists() {
     var kind = selectedKind();
-    fillSelect("fr-model", api.modelOptionsForKind(kind), api.defaultModelForKind(kind));
-    fillSelect("fr-aspect", api.aspectOptionsForKind(kind), "9:16");
-    fillSelect("fr-duration", api.durationOptionsForModel($("fr-model") ? $("fr-model").value : api.defaultModelForKind(kind)), "8");
+    fillSelect("fr-model", modelOptionsForKind(kind), defaultModelForKind(kind));
+    fillSelect("fr-aspect", aspectOptionsForKind(kind), "9:16");
+    fillSelect("fr-duration", durationOptionsForModel($("fr-model") ? $("fr-model").value : defaultModelForKind(kind)), "8");
     var countRow = $("fr-count-row");
     var durationRow = $("fr-duration-row");
     try {
@@ -550,7 +648,7 @@
       return Promise.resolve([]);
     }
     return proxyClient().listJobs().then(function (jobs) {
-      setHtml("fr-jobs-list", api.jobListHtml(jobs));
+      setHtml("fr-jobs-list", jobListHtml(jobs));
       wireMediaButtons(list);
       // Cache the list so a panel re-inject restores instantly.
       try {
@@ -585,7 +683,7 @@
       try {
         var jobs = res && Array.isArray(res.flowRemoteJobs) ? res.flowRemoteJobs : [];
         if (jobs.length && settings.serverUrl && settings.token) {
-          setHtml("fr-jobs-list", api.jobListHtml(jobs));
+          setHtml("fr-jobs-list", jobListHtml(jobs));
           wireMediaButtons($("fr-jobs-list"));
         }
       } catch (e) {}
@@ -616,7 +714,7 @@
       profile: account.name,
       kind: kind,
       prompt: prompt,
-      model: $("fr-model") ? $("fr-model").value : api.defaultModelForKind(kind),
+      model: $("fr-model") ? $("fr-model").value : defaultModelForKind(kind),
       aspect: $("fr-aspect") ? $("fr-aspect").value : "9:16"
     };
     if (kind === "image") {
@@ -973,7 +1071,7 @@
         modelEl.addEventListener("change", function () {
           var kind = selectedKind();
           if (kind === "video") {
-            fillSelect("fr-duration", api.durationOptionsForModel(modelEl.value), "8");
+            fillSelect("fr-duration", durationOptionsForModel(modelEl.value), "8");
           }
         });
       }
@@ -988,7 +1086,7 @@
       if (saveBtn) saveBtn.addEventListener("click", function () {
         var url = $("fr-server-url") ? $("fr-server-url").value : "";
         var token = $("fr-token") ? $("fr-token").value : "";
-        settings.serverUrl = api.normalizeBaseUrl(url);
+        settings.serverUrl = normalizeBaseUrl(url);
         settings.token = token.trim();
         storageSet({ serverUrl: settings.serverUrl, token: settings.token }, function () {
           showMsg("fr-settings-msg", "Saved.", "ok-msg");
@@ -1001,7 +1099,7 @@
       if (testBtn) testBtn.addEventListener("click", function () {
         var url = $("fr-server-url") ? $("fr-server-url").value : "";
         var token = $("fr-token") ? $("fr-token").value : "";
-        var trial = { serverUrl: api.normalizeBaseUrl(url), token: token.trim() };
+        var trial = { serverUrl: normalizeBaseUrl(url), token: token.trim() };
         showMsg("fr-settings-msg", "Testing…", "");
         apiCall("GET", "/health", null, trial).then(function (h) {
           if (h && h.stopped) {

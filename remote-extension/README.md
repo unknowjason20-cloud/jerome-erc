@@ -1,4 +1,4 @@
-# Flow Remote (v1.1.0)
+# Flow Remote (v1.1.1)
 
 Remote control for your own Google Flow server running in a GitHub Codespace. You tap here on your iPhone; the server does the clicking in headed Chrome in the Codespace and sends the results back.
 
@@ -16,7 +16,7 @@ Remote control for your own Google Flow server running in a GitHub Codespace. Yo
 
 ## Install (Orion on iOS)
 
-1. Get the ZIP (`flow-remote-v1.1.0.zip`) — the `manifest.json` is at the ZIP root.
+1. Get the ZIP (`flow-remote-v1.1.1-orion.zip`) — the `manifest.json` is at the ZIP root.
 2. Save it to **On My iPhone** (local storage, not iCloud Drive).
 3. In Orion: `⋯ → Extensions → + → Install from File`, pick the ZIP.
 4. Uninstall any older Flow Remote copy first (sideloaded extensions never auto-update).
@@ -62,4 +62,4 @@ On desktop the classic popup still works: tap the Flow Remote toolbar icon. It h
 - Jobs auto-refresh every 5 seconds only while the panel (or popup) is open.
 - Image default: Nano Banana 2 (cheapest), 9:16, count 1. Video default: Veo Lite, 8s. 10s is only offered for Omni Flash.
 - Panel state (server URL, token, panel open/closed, last job list) is kept in `chrome.storage.local` only, so a page reload restores it.
-- v1.1.0 mock chain test: `node tests/test-panel-chain.js` (panel inject, toggle, settings round-trip, background proxy, blocked-job handling, beacon). Live Orion test still pending — please report what you see.
+- v1.1.1 mock chain test: `node tests/test-panel-chain.js` (panel inject, toggle, settings round-trip, background proxy, blocked-job handling, beacon). Live Orion test still pending — please report what you see.

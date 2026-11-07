@@ -1,7 +1,7 @@
-// Flow Remote — node mock chain test for the v1.1.0 in-page panel.
+// Flow Remote — node mock chain test for the v1.1.1 in-page panel.
 // NOT shipped in the extension ZIP. Run: node tests/test-panel-chain.js
 // Uses a fake DOM + mocked chrome.* + mocked fetch with canned server
-// responses. Covers the v1.1.0 brief's required cases:
+// responses. Covers the v1.1.1 brief's required cases:
 //   1. panel injects (host on documentElement, floating button, hidden panel)
 //   2. button toggles panel open/closed
 //   3. settings save/load round-trip via mocked chrome.storage
@@ -213,7 +213,7 @@ const store = {
   token: "secret-token-123",
   flowRemotePanelOpen: false,
   flowRemoteJobs: [],
-  flowRemoteBeacon: { version: "1.1.0", startedAt: "2026-11-07T00:00:00.000Z", alive: true }
+  flowRemoteBeacon: { version: "1.1.1", startedAt: "2026-11-07T00:00:00.000Z", alive: true }
 };
 const fetchCalls = [];
 let noPing = false;
@@ -222,7 +222,7 @@ function mockSendMessage(msg, cb) {
   if (!msg || typeof msg.type !== "string") { if (cb) cb(null); return; }
   if (msg.type === "ping") {
     if (noPing) return; // background never answers
-    if (cb) cb({ ok: true, alive: true, version: "1.1.0" });
+    if (cb) cb({ ok: true, alive: true, version: "1.1.1" });
     return;
   }
   if (msg.type === "getSettings") {
@@ -269,24 +269,22 @@ function makeStorageMock(backing) {
   const popupSrc = fs.readFileSync(path.join(EXT_DIR, "popup.js"), "utf8");
 
   // ---- static checks ----
-  await check("manifest v1.1.0: content script on flow.google.com + popup kept", () => {
-    assert.strictEqual(manifest.version, "1.1.0");
+  await check("manifest v1.1.1: single-file content script on flow.google.com + popup kept", () => {
+    assert.strictEqual(manifest.version, "1.1.1");
     assert.strictEqual(manifest.manifest_version, 3);
     assert.deepStrictEqual(manifest.permissions, ["storage"]);
     assert.ok(Array.isArray(manifest.content_scripts) && manifest.content_scripts.length >= 1);
     const cs = manifest.content_scripts[0];
     assert.deepStrictEqual(cs.matches, ["*://flow.google.com/*"]);
-    assert.ok(cs.js.includes("content-panel.js"), "content script must load content-panel.js");
-    assert.ok(cs.js.includes("api.js"), "content script must load api.js before the panel");
+    assert.deepStrictEqual(cs.js, ["content-panel.js"],
+      "v1.1.1: content script must be the single self-contained content-panel.js (no api.js entry)");
     assert.ok(manifest.host_permissions.some((h) => h.includes("*.app.github.dev")),
       "host_permissions must cover *.app.github.dev");
     assert.ok(manifest.host_permissions.some((h) => h.includes("localhost")),
       "host_permissions must cover localhost");
     assert.strictEqual(manifest.action.default_popup, "popup.html", "popup kept as desktop fallback");
-    assert.ok(Array.isArray(manifest.background.scripts) &&
-      manifest.background.scripts.includes("api.js") &&
-      manifest.background.scripts.includes("background.js"),
-      "background.scripts must load api.js then background.js");
+    assert.deepStrictEqual(manifest.background.scripts, ["background.js"],
+      "v1.1.1: background.scripts must be the single self-contained background.js (no api.js, no importScripts)");
     assert.strictEqual(manifest.background.service_worker, "background.js");
     for (const f of ["content-panel.js", "background.js", "api.js", "popup.js", "popup.html"]) {
       assert.ok(fs.existsSync(path.join(EXT_DIR, f)), f + " missing");
@@ -321,10 +319,14 @@ function makeStorageMock(backing) {
       "drag touch handlers must use {passive:false}");
   });
 
-  await check("background: guarded importScripts, no timers/polling, beacon written", () => {
-    assert.ok(/typeof importScripts === "function"/.test(bgSrc), "importScripts must be typeof-guarded");
+  await check("background: NO importScripts at all (single-file), no timers/polling, beacon written", () => {
+    // Comments may name importScripts; only code lines count.
+    const bgCode = bgSrc.split("\n").filter((l) => !/^\s*(\/\/|\*)/.test(l.trim())).join("\n");
+    assert.ok(!/importScripts\s*\(/.test(bgCode), "importScripts must be absent in v1.1.1 (single-file background)");
+    // No setInterval (polling lives in the panel). setTimeout is allowed
+    // ONLY as the per-request fetch abort timer inside the inlined
+    // request() — not as a loop.
     assert.ok(!/setInterval/.test(bgSrc), "background must not poll");
-    assert.ok(!/setTimeout/.test(bgSrc), "background must not use timers");
     assert.ok(bgSrc.includes("flowRemoteBeacon"), "background must write the health beacon");
     assert.ok(/type:\s*"api"/.test(bgSrc) || /"api"/.test(bgSrc), "background must handle api proxy messages");
     assert.ok(/type:\s*"ping"/.test(bgSrc) || /"ping"/.test(bgSrc), "background must answer ping");
@@ -365,7 +367,7 @@ function makeStorageMock(backing) {
   await check("background writes boot beacon to storage.local", () => {
     const b = bgStore.flowRemoteBeacon;
     assert.ok(b, "no beacon in storage");
-    assert.strictEqual(b.version, "1.1.0");
+    assert.strictEqual(b.version, "1.1.1");
     assert.ok(typeof b.startedAt === "string" && b.startedAt.length > 0, "beacon needs startedAt");
     assert.strictEqual(b.alive, true);
   });

@@ -14,7 +14,7 @@
 ## Tapos na / built na — hindi mo na kailangang gawin
 
 - ✅ Ang server (Python, walang pip install na kailangan) — nasa `server/` folder.
-- ✅ Ang extension na "Flow Remote" v1.1.0 — nasa `remote-extension/` folder, at may ZIP na rin (`flow-remote-v1.1.0-orion.zip`). **v1.1.0: in-page panel na ang UI, hindi popup** — sa Orion ayaw lumabas ng popup, kaya ang panel na nasa mismong flow.google.com page ang gagamitin mo (floating ⚡ button, i-tap mo lang). Ang popup ay pang-desktop na lang.
+- ✅ Ang extension na "Flow Remote" v1.1.1 — nasa `remote-extension/` folder, at may ZIP na rin (`flow-remote-v1.1.1-orion.zip`). **v1.1.1: in-page panel na ang UI, hindi popup** — sa Orion ayaw lumabas ng popup, kaya ang panel na nasa mismong flow.google.com page ang gagamitin mo (floating ⚡ button, i-tap mo lang). Ang popup ay pang-desktop na lang.
 - ✅ Ang Codespace setup (`.devcontainer/`) — nag-i-install ng totoong Chrome + `gflow` + desktop, at naka-set na ang `DISPLAY=:1`.
 - ✅ Mock tests: server 13 passed / 0 failed; extension panel chain 26 passed / 0 failed; extension popup 14 passed / 0 failed; end-to-end mock 18 passed / 0 failed. **Mock lang lahat — hindi pa ito nasubukan sa totoong Flow.**
 
@@ -26,7 +26,7 @@
 
 - [ ] GitHub account mo (yung may access sa repo na **jerome-erc**).
 - [ ] **Orion browser** sa iPhone mo (doon lang mai-install ang extension).
-- [ ] Ang extension ZIP — **`flow-remote-v1.1.0-orion.zip`** — naka-attach sa chat message kung saan mo ito natanggap.
+- [ ] Ang extension ZIP — **`flow-remote-v1.1.1-orion.zip`** — naka-attach sa chat message kung saan mo ito natanggap.
 - [ ] Dalawang Google account: ang **main account** mo at ang **test account** (`unknowjason20@gmail.com`). **Test account muna ang gagamitin mo** — huwag ang main sa unang test.
 - [ ] Phone mo, handa para sa 2FA / verification kung hingin ng Google.
 
@@ -136,7 +136,7 @@ gflow auth status
 
 ## Hakbang 6: I-install ang extension ZIP sa Orion
 
-1. Kunin ang ZIP na **`flow-remote-v1.1.0-orion.zip`** at i-save ito sa **On My iPhone** (local storage — **hindi** iCloud Drive).
+1. Kunin ang ZIP na **`flow-remote-v1.1.1-orion.zip`** at i-save ito sa **On My iPhone** (local storage — **hindi** iCloud Drive).
 2. Buksan ang **Orion** sa iPhone mo.
 3. Pumunta sa **`⋯` → Extensions → `+` → Install from File**, at piliin ang ZIP.
 4. Kapag na-install na, buksan ang **flow.google.com** sa Orion — may lilitaw na floating button na **⚡ Flow Remote**. I-tap mo ito para buksan ang panel.
@@ -207,7 +207,7 @@ Saka ka lang mag-test ng video — at **isang video lang muna**, 8 segundo, `veo
 
 ## Checklist — lahat ng hakbang
 
-- [ ] Nakuha ko ang extension ZIP (`flow-remote-v1.1.0-orion.zip`) mula sa chat (naka-attach).
+- [ ] Nakuha ko ang extension ZIP (`flow-remote-v1.1.1-orion.zip`) mula sa chat (naka-attach).
 - [ ] Gumawa ako ng Codespace mula sa repo na **jerome-erc** (Code → Codespaces → Create codespace on main, 2-core).
 - [ ] Hinintay kong matapos mag-build ang Codespace.
 - [ ] Na-sync na sa repo ang `server/` at `remote-extension/` files.

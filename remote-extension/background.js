@@ -21,34 +21,130 @@
 // WebKit kills background contexts quickly, so this file must do its
 // work synchronously-shaped and exit.
 //
-// api.js is loaded BEFORE this file via background.scripts on
-// background-page browsers. On service-worker browsers (Chrome) only
-// `background.service_worker` runs, so api.js is pulled in here with a
-// GUARDED importScripts() — unguarded importScripts() throws in a
-// background page and aborts the whole file before any listener
-// registers (the Inkpour root cause).
+// Single-file by design (v1.1.1): the fetch client is inlined below,
+// so this file needs no other script and no importScripts() at all.
 
 (function () {
   "use strict";
 
-  var VERSION = "1.1.0";
+  var VERSION = "1.1.1";
 
-  // Load api.js when running as a service worker (importScripts exists
-  // only in WorkerGlobalScope; it is absent in a background page, where
-  // background.scripts already loaded api.js).
-  try {
-    if (typeof importScripts === "function" &&
-        (typeof FlowRemoteApi === "undefined")) {
-      importScripts("api.js");
+  // Self-contained in v1.1.1: the fetch client below is inlined from
+  // api.js so the background is a SINGLE file — no api.js load, no
+  // importScripts at all (its unguarded form aborts the whole file
+  // on Orion). The popup still loads api.js itself on desktop.
+
+  var TIMEOUT_MS = 15000;
+
+  function normalizeBaseUrl(url) {
+    if (typeof url !== "string") return "";
+    return url.trim().replace(/\/+$/, "");
+  }
+
+  function apiError(code, message) {
+    var err = new Error(message);
+    err.code = code;
+    return err;
+  }
+
+  function serverMessage(body) {
+    try {
+      if (body && typeof body === "object") {
+        if (typeof body.error === "string" && body.error) return body.error;
+        if (typeof body.message === "string" && body.message) return body.message;
+        if (typeof body.detail === "string" && body.detail) return body.detail;
+      }
+    } catch (e) {}
+    return "";
+  }
+
+  function errorForStatus(status, body) {
+    var msg = serverMessage(body);
+    if (status === 401) {
+      return apiError("wrong_token",
+        "Wrong or expired pairing token. Re-copy the token from the " +
+        "Codespace terminal and paste it in Settings.");
     }
-  } catch (e) {}
+    if (status === 503) {
+      return apiError("stopped",
+        "Server stopped (unusual-activity stop). Stop sending jobs and " +
+        "restart the server in the Codespace.");
+    }
+    if (status === 404) {
+      return apiError("not_found",
+        msg || "Not found on the server (unknown profile or job).");
+    }
+    if (status === 400) {
+      return apiError("validation", msg || "The server rejected the job (check the form).");
+    }
+    return apiError("server", msg || ("Server error (HTTP " + status + ")."));
+  }
 
-  var api = null;
-  try {
-    api = (typeof FlowRemoteApi !== "undefined") ? FlowRemoteApi : null;
-  } catch (e) { api = null; }
-  if (!api && typeof require === "function") {
-    try { api = require("./api.js"); } catch (e) { api = null; }
+  function request(settings, method, path, body, fetchFn) {
+    var baseUrl = normalizeBaseUrl(settings && settings.serverUrl);
+    var token = settings && settings.token ? String(settings.token) : "";
+    if (!baseUrl) {
+      return Promise.reject(apiError("not_configured",
+        "Not configured yet — enter the server URL and pairing token in Settings."));
+    }
+    if (!token) {
+      return Promise.reject(apiError("not_configured",
+        "No pairing token saved — paste it in Settings first."));
+    }
+    var doFetch = fetchFn || (typeof fetch !== "undefined" ? fetch : null);
+    if (!doFetch) {
+      return Promise.reject(apiError("network", "fetch is not available in this browser."));
+    }
+
+    var controller = null;
+    var signal = undefined;
+    try {
+      if (typeof AbortController !== "undefined") {
+        controller = new AbortController();
+        signal = controller.signal;
+      }
+    } catch (e) { controller = null; }
+    var timer = null;
+    if (controller) {
+      timer = setTimeout(function () { try { controller.abort(); } catch (e) {} }, TIMEOUT_MS);
+    }
+
+    var headers = { "X-Flow-Token": token };
+    var opts = { method: method, headers: headers };
+    if (signal) opts.signal = signal;
+    if (body !== undefined && body !== null) {
+      headers["Content-Type"] = "application/json";
+      opts.body = JSON.stringify(body);
+    }
+
+    return Promise.resolve()
+      .then(function () { return doFetch(baseUrl + path, opts); })
+      .then(function (res) {
+        if (timer) clearTimeout(timer);
+        var status = res && typeof res.status === "number" ? res.status : 0;
+        return Promise.resolve()
+          .then(function () {
+            if (res && typeof res.json === "function") return res.json();
+            return null;
+          })
+          .catch(function () { return null; })
+          .then(function (data) {
+            if (status >= 200 && status < 300) return data;
+            throw errorForStatus(status, data);
+          });
+      })
+      .catch(function (err) {
+        if (timer) clearTimeout(timer);
+        if (err && err.code) throw err; // already a mapped apiError
+        var name = err && err.name ? String(err.name) : "";
+        var msg = err && err.message ? String(err.message) : "";
+        if (name === "AbortError" || /abort/i.test(msg)) {
+          throw apiError("timeout",
+            "Server did not answer in " + (TIMEOUT_MS / 1000) + "s — is the Codespace still running?");
+        }
+        throw apiError("network",
+          "Cannot reach the server. Check the URL and that the Codespace is running. (" + (msg || "network error") + ")");
+      });
   }
 
   var settingsCache = { serverUrl: "", token: "" };
@@ -122,18 +218,11 @@
           }
 
           if (msg.type === "api") {
-            if (!api) {
-              try {
-                sendResponse({ ok: false, code: "server",
-                  message: "Background API client unavailable — reload the page." });
-              } catch (e) {}
-              return false;
-            }
             var s = (msg && msg.settings) || { serverUrl: "", token: "" };
             var method = typeof msg.method === "string" ? msg.method : "GET";
             var path = typeof msg.path === "string" ? msg.path : "/";
             var body = msg.body === undefined ? null : msg.body;
-            api.request(s, method, path, body)
+            request(s, method, path, body)
               .then(function (data) {
                 try { sendResponse({ ok: true, data: data }); } catch (e) {}
               })
