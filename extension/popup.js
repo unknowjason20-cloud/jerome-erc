@@ -12,7 +12,7 @@ function render(entries) {
   list.innerHTML = "";
   entries.slice().reverse().forEach((e) => {
     const div = el("div", "entry");
-    const src = e.source === "page-hook" ? "[page hook] " : e.source === "webrequest" ? "[webRequest] " : "";
+    const src = e.source === "page-hook" ? "[page hook] " : "";
     div.appendChild(el("div", "rpcids", src + (e.rpcids && e.rpcids.length ? e.rpcids.join(", ") : "(no rpcid)") + "  " + (e.method || "")));
     div.appendChild(el("div", "time", e.time || ""));
     div.appendChild(el("div", "url", e.url || ""));
@@ -40,8 +40,7 @@ function load() {
         return;
       }
       statusEl.textContent =
-        "webRequest: " + (st.webRequest ? "on" : "off") +
-        "  •  page hook: " + (st.pageHook ? "active" : "not seen yet") +
+        "capture: page hook " + (st.pageHook ? "active" : "not seen yet") +
         "  •  " + (st.count || 0) + " in memory";
       chrome.runtime.sendMessage({ type: "getLog" }, (res) => {
         if (chrome.runtime.lastError || !res) {

@@ -3,13 +3,12 @@
 // OBSERVATION ONLY: it never reads auth headers or cookies, never replays a
 // request and never submits anything. Everything stays in this browser.
 //
-// Two capture paths:
-//  1. chrome.webRequest.onBeforeRequest (desktop Chrome / Orion macOS).
-//     Guarded: on Orion iOS the webRequest events are partial or missing,
-//     so a missing event must never abort this file.
-//  2. A MAIN-world content script (content-main.js) that hooks the page's
-//     own fetch/XHR. This is the working path on Orion iOS. It sends each
-//     captured request here as a "pageRequest" message.
+// Page-hook-only build (v1.3.0, Orion-compatible): there is NO webRequest
+// permission and no webRequest listener. Orion on iOS only partially
+// supports webRequest, and merely declaring the permission triggers its
+// "Extension Compatibility Issue" warning at install. The capture path is
+// the MAIN-world content script (content-main.js) + bridge
+// (content-bridge.js), which works wherever the page's own fetch/XHR runs.
 
 const entries = [];
 const MAX_ENTRIES = 500;
@@ -38,8 +37,8 @@ function persist() {
 }
 
 function pushEntry(entry) {
-  // Dedupe: on desktop both capture paths can see the same request
-  // (webRequest + page hook). Drop an identical url+body seen < 3s ago.
+  // Dedupe: the same request seen twice (e.g. page hook + a later
+  // snapshot) must not log twice. Drop an identical url+body seen < 3s ago.
   try {
     const t = Date.parse(entry.time || "");
     for (let i = entries.length - 1; i >= 0 && i >= entries.length - 20; i--) {
@@ -55,22 +54,6 @@ function pushEntry(entry) {
   persist();
 }
 
-function bodyText(details) {
-  try {
-    const rb = details.requestBody;
-    if (!rb) return "";
-    if (rb.formData && rb.formData["f.req"] && rb.formData["f.req"][0]) {
-      return String(rb.formData["f.req"][0]).slice(0, MAX_BODY_CHARS);
-    }
-    if (rb.raw && rb.raw[0] && rb.raw[0].bytes) {
-      return new TextDecoder().decode(new Uint8Array(rb.raw[0].bytes)).slice(0, MAX_BODY_CHARS);
-    }
-    return "";
-  } catch (e) {
-    return "";
-  }
-}
-
 // Restore the persisted log so a suspended/killed background does not wipe it.
 try {
   chrome.storage.local.get({ flowCaptureLog: [] }, (res) => {
@@ -81,34 +64,8 @@ try {
   });
 } catch (e) {}
 
-// Path 1: webRequest (guarded — missing on Orion iOS, must not throw).
-try {
-  const wr = chrome.webRequest && chrome.webRequest.onBeforeRequest;
-  if (wr && typeof wr.addListener === "function") {
-    wr.addListener(
-      (details) => {
-        if (!details.url.includes("batchexecute")) return;
-        pushEntry({
-          time: new Date(details.timeStamp).toISOString(),
-          method: details.method,
-          url: details.url,
-          rpcids: rpcidsFromUrl(details.url),
-          frep: bodyText(details),
-          tabId: details.tabId,
-          source: "webrequest",
-        });
-      },
-      { urls: ["*://flow.google.com/*", "*://*.googleapis.com/*"] },
-      ["requestBody"]
-    );
-    status.webRequest = true;
-  }
-} catch (e) {
-  status.webRequest = false;
-}
-
 // Guarded like everything else: if chrome.runtime is somehow absent at
-// startup, the listeners above must not take the whole file down with them.
+// startup, the listeners must not take the whole file down with them.
 try {
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (!msg || typeof msg.type !== "string") return false;
